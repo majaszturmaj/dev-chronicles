@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Default Tauri capabilities configuration",
+  "platforms": ["linux", "windows", "macOS"],
+  "permissions": []
+}

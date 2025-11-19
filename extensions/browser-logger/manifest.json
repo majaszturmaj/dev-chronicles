@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "DevChronicle Browser Logger",
+  "description": "Captures active browser tabs and forwards them to the DevChronicle desktop app.",
+  "version": "0.0.1",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:3030/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "DevChronicle Browser Logger"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
+

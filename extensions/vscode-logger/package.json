@@ -1,0 +1,38 @@
+{
+  "name": "dev-chronicle-vscode-logger",
+  "displayName": "DevChronicle Activity Logger",
+  "description": "Sends VS Code save events to the DevChronicle desktop hub.",
+  "version": "0.0.1",
+  "publisher": "devchronicle",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "DevChronicle Logger",
+      "properties": {
+        "devChronicle.endpoint": {
+          "type": "string",
+          "default": "http://localhost:3030",
+          "description": "Base URL for the DevChronicle ingest server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.84.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.4.0"
+  }
+}
+

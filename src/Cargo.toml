@@ -1,0 +1,31 @@
+[package]
+name = "dev-chronicles"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "dev_chronicles"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+axum = "0.7"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "runtime-tokio-native-tls"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors"] }
+
+tauri = { version = "2.0.0", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-fs = "2.0.0"
+
+anyhow = "1.0"
+
+regex = "1.10"
+lazy_static = "1.4" 
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }

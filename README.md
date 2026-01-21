@@ -2,7 +2,22 @@
 
 DevChronicle is a hybrid desktop application (Tauri) that ingests developer activity (browser, terminal, VSCode) and generates AI summaries. It includes a React + Vite frontend and a Rust/Tauri backend with an embedded Axum ingestion server and SQLite storage.
 
-## Quick Setup
+## 🚀 Quick Start
+
+**The easiest way to run everything:**
+
+```bash
+./run.sh
+```
+
+This single command starts:
+- ✅ Frontend dev server (Vite) on `http://localhost:5173`
+- ✅ Desktop app window with Tauri
+- ✅ Backend ingestion server on `http://127.0.0.1:3030`
+
+Press `Ctrl+C` to stop. That's it!
+
+## Setup
 
 These steps get the project running locally. The project expects Node (npm) and Rust toolchains installed.
 

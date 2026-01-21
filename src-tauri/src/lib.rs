@@ -25,6 +25,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_logs_by_date,
             commands::get_ai_reports,
+            commands::get_reports_by_date,
             commands::trigger_manual_summary,
             commands::fetch_ai_settings,
             commands::save_ai_settings,

@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import Timeline from "./Timeline";
 import ReportView from "./ReportView";
+import ReportsList from "./ReportsList";
 import CollapsibleSection from "./CollapsibleSection";
-import { ActivityLog } from "../../types";
+import { ActivityLog, AiReport } from "../../types";
 
 interface DashboardProps {
   logs: ActivityLog[];
@@ -12,6 +13,11 @@ interface DashboardProps {
   isGeneratingReport: boolean;
   latestReport?: string;
   reportError?: string;
+  reportsForDate: AiReport[];
+  isLoadingReports: boolean;
+  reportsError?: string;
+  onDateChange: (date: string) => void;
+  selectedDate: string;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -22,6 +28,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   isGeneratingReport,
   latestReport,
   reportError,
+  reportsForDate,
+  isLoadingReports,
+  reportsError,
+  onDateChange,
+  selectedDate,
 }) => {
   return (
     <div className="space-y-6">
@@ -59,12 +70,38 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Timeline logs={logs} />
 
       <CollapsibleSection
-        title="AI Reports"
+        title="Latest AI Report"
         maxHeight="400px"
         defaultCollapsed={!latestReport}
       >
         <div className="space-y-4">
           <ReportView content={latestReport} />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="All Reports for Date"
+        maxHeight="700px"
+        defaultCollapsed={reportsForDate.length === 0}
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="reportDatePicker" className="text-sm font-medium text-slate-200">
+              Select Date:
+            </label>
+            <input
+              id="reportDatePicker"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+          <ReportsList
+            reports={reportsForDate}
+            isLoading={isLoadingReports}
+            error={reportsError}
+          />
         </div>
       </CollapsibleSection>
     </div>

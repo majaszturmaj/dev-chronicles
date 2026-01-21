@@ -6,9 +6,12 @@ export interface ActivityLog {
 }
 
 export interface AiReport {
-  id: string;
+  id: string | number;
   summary: string;
-  createdAt: string;
+  generated_at: string;
+  log_count?: number;
+  sources?: string;
+  session_id?: string;
 }
 
 export interface AiSettings {

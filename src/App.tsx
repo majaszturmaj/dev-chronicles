@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Dashboard from "./components/Dashboard/Dashboard";
 import Settings from "./components/Settings/Settings";
-import { ActivityLog, AiSettings } from "./types";
+import { ActivityLog, AiSettings, AiReport } from "./types";
 import { invokeCommand } from "./utils/tauri";
 
 function App(): JSX.Element {
@@ -14,6 +14,12 @@ function App(): JSX.Element {
   const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
   const [activeView, setActiveView] = useState<"dashboard" | "settings">("dashboard");
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [reportsForDate, setReportsForDate] = useState<AiReport[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState<boolean>(false);
+  const [reportsError, setReportsError] = useState<string>();
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -54,6 +60,27 @@ function App(): JSX.Element {
     };
 
     loadSettings();
+  }, []);
+
+  const handleDateChange = async (date: string) => {
+    setSelectedDate(date);
+    setIsLoadingReports(true);
+    setReportsError(undefined);
+
+    try {
+      const response = await invokeCommand<AiReport[]>("get_reports_by_date", { date });
+      setReportsForDate(response);
+    } catch (err) {
+      console.error("Failed to fetch reports", err);
+      setReportsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
+  // Load reports for the initial selected date
+  useEffect(() => {
+    handleDateChange(selectedDate);
   }, []);
 
   const handleGenerateReport = async () => {
@@ -118,6 +145,11 @@ function App(): JSX.Element {
             isGeneratingReport={isGeneratingReport}
             latestReport={latestReport}
             reportError={reportError}
+            reportsForDate={reportsForDate}
+            isLoadingReports={isLoadingReports}
+            reportsError={reportsError}
+            onDateChange={handleDateChange}
+            selectedDate={selectedDate}
           />
 
           <section className="mt-8 rounded-lg border border-slate-800 bg-slate-900/60 overflow-hidden">

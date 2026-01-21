@@ -56,8 +56,40 @@ pub async fn get_ai_reports(
     pool: State<'_, SqlitePool>,
 ) -> Result<Vec<AiReport>, String> {
     sqlx::query_as::<_, AiReportRow>(
-        "SELECT id, summary, generated_at FROM ai_reports ORDER BY generated_at DESC LIMIT 20",
+        "SELECT id, summary, generated_at, log_count, sources, session_id FROM ai_reports ORDER BY generated_at DESC LIMIT 20",
     )
+    .fetch_all(pool.inner())
+    .await
+    .map_err(|err| err.to_string())?
+    .into_iter()
+    .map(AiReport::try_from)
+    .collect::<Result<Vec<_>, ActivityLogConversionError>>()
+    .map_err(|err| err.0)
+}
+
+#[tauri::command]
+pub async fn get_reports_by_date(
+    date: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<Vec<AiReport>, String> {
+    let parsed_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|err| format!("invalid date format: {err}"))?;
+
+    let start = DateTime::<Utc>::from_naive_utc_and_offset(
+        parsed_date
+            .and_hms_opt(0, 0, 0)
+            .ok_or_else(|| "failed to construct start time".to_string())?,
+        Utc,
+    );
+    let end = start + Duration::days(1);
+
+    sqlx::query_as::<_, AiReportRow>(
+        "SELECT id, summary, generated_at, log_count, sources, session_id FROM ai_reports \
+         WHERE generated_at >= ?1 AND generated_at < ?2 \
+         ORDER BY generated_at DESC",
+    )
+    .bind(start.to_rfc3339())
+    .bind(end.to_rfc3339())
     .fetch_all(pool.inner())
     .await
     .map_err(|err| err.to_string())?

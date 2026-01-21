@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
     ai::client::AiClient,
-    db::{get_ai_settings, models::ActivityLog},
+    db::{get_ai_settings, models::{ActivityLog, AiReportRow}},
 };
 use sqlx::SqlitePool;
 
@@ -14,35 +14,73 @@ use crate::sanitizer::sanitize_json;
 
 const SYSTEM_PROMPT: &str = r#"
 **ROLE:**
-You are an expert Technical Documentation Assistant. Your goal is to analyze raw activity logs (terminal commands and browser history) from a software developer's session and synthesize them into a concise, structured "Work Log" entry.
+You are an expert Technical Documentation Assistant. Your goal is to analyze raw activity logs (terminal commands, browser history, and file edits) from a software developer's session and synthesize them into a concise, structured "Work Log" entry that connects to ongoing work.
+
+**CONTEXT AWARENESS:**
+You will receive summaries of the user's recent work sessions. Use these to:
+- Recognize ongoing projects or tasks
+- Note progress and blockers relative to prior sessions
+- Highlight connections between current and past work
+- Avoid repeating information already documented in recent sessions
+
 **INPUT DATA:**
-You will receive a chronological stream of data covering a specific time interval (e.g., 10 minutes). The data includes:
-1. **Terminal:** Shell commands (STDIN) and key outputs (STDOUT/STDERR).
-2. **Browser:** Visited URLs, page titles, and potentially snippets of page content.
+You will receive a chronological stream of data including:
+1. **Terminal:** Shell commands and key outputs
+2. **Browser:** Visited URLs, page titles, research activities
+3. **VSCode/Editors:** File edits, saves, and language contexts
+4. **Recent Context:** Summaries from the last 1-3 sessions (if available)
+
 **INSTRUCTIONS:**
-1. **Identify Intent:** Do not just list actions. Analyze the correlation between browser searches and terminal commands to determine the user's high-level goal (e.g., "Fixing CORS error in Nginx").
-2. **Filter Noise:**
-* Ignore trivial terminal navigation commands (`cd`, `ls`, `pwd`) unless relevant to the context.
-* Ignore non-work-related browsing (social media, music, news) unless they appear to be the primary activity.
-* Ignore repetitious typos or failed commands that were immediately corrected.
-3. **Synthesize:** Group related actions.
-* *Input:* User searched for "python list comprehension", then wrote a script, then ran it.
-* *Output:* "Implemented data processing logic using Python list comprehensions."
-4. **Security & Privacy (CRITICAL):**
-* **NEVER** include passwords, API keys, secrets, or PII (Personally Identifiable Information) in the output.
-* If a secret is detected in the logs, replace it with `[REDACTED_SECRET]`.
-5. **Format:** Output strictly in Markdown.
+1. **Identify Intent:** Don't just list actions. Analyze correlations to determine high-level goals:
+   - "Searched for Docker + Kubernetes" + "edited deployment.yaml" + "ran kubectl commands" = "Setting up Kubernetes deployment"
+   - Reference prior sessions if relevant ("Continuing work on feature X from yesterday")
+
+2. **Extract Meaningful Signals:**
+   - Terminal: Extract command families (npm build, git, docker, etc.), success/failure patterns
+   - Browser: Focus on documentation, GitHub issues, StackOverflow—ignore casual browsing
+   - Editor: Note file modifications, languages worked on, project changes
+
+3. **Filter Noise:**
+   - Skip trivial navigation (`cd`, `ls`, `pwd`) unless revealing directory context
+   - Ignore failed commands that were immediately retried
+   - Skip non-work browsing
+
+4. **Synthesize & Sequence:**
+   - Group related actions chronologically
+   - Show cause-and-effect ("Found solution in X, applied to Y, verified with Z")
+   - Highlight blockers or unexpected patterns
+
+5. **Continuity & Progress:**
+   - If recent context provided, note whether this session continues, pivots, or completes prior work
+   - Flag when a multi-session task shows progress or reaches a milestone
+
+6. **Security & Privacy (CRITICAL):**
+   - NEVER include passwords, API keys, secrets, or PII
+   - Replace detected secrets with `[REDACTED_SECRET]`
+   - Redact internal IPs and identifiable file paths where possible
+
+7. **Format:** Output in Markdown with clear sections.
+
 **OUTPUT FORMAT:**
-## ⏱️ [Time Range, e.g., 10:00 - 10:15]
-**Context:** [One-sentence summary of the main focus]
+## ⏱️ [Time Range]
+**Focus:** [One-sentence summary of primary task]
+**Status:** [Continuing / New / Completed / Blocked]
+
 ### 🛠️ Key Actions
-- [Bullet point describing a significant technical step]
-- [Bullet point connecting a research step to an implementation step]
-### 🔗 References & Resources
-- [Link Title](URL) - [Brief note on why this was useful, e.g., "Solution for error X"]
-### 💻 Notable Commands / Code
-```bash
-[Insert only the critical/successful commands or snippets here] 
+- [Technical step + brief outcome]
+- [Connected action showing causality]
+
+### 📊 Activity Breakdown
+- **Terminal:** [Summary of commands and their intent]
+- **Research:** [URLs and findings if applicable]
+- **Edits:** [Files modified and changes made]
+
+### 🔗 Related to Prior Work
+- [Connection to recent sessions if applicable, or "New focus"]
+
+### ⚠️ Blockers or Notes
+- [Any blockers, errors, or notable patterns]
+
 "#;
 
 #[derive(Serialize)]
@@ -86,21 +124,36 @@ pub async fn generate_summary(
         .await
         .context("failed to load AI settings")?;
 
-    // 🔧 DYNAMIC MODEL SELECTION
+    // Fetch recent summaries for context (last 3)
+    let recent_context = fetch_recent_summaries(pool, 3).await.unwrap_or_default();
+
+    // Dynamic model selection
     let model_name = if ai_settings.provider_url.contains("openai.com") {
-        "gpt-4o-mini"  // or "gpt-3.5-turbo" for cheaper option
+        "gpt-4o-mini"
     } else if ai_settings.provider_url.contains("anthropic.com") {
         "claude-3-5-sonnet-20241022"
     } else {
-        // LM Studio or other local models - use a generic name
-        // The actual model is selected in LM Studio UI
         "local-model"
     };
 
     let formatted_logs = format_logs(logs)?;
+    
+    // Build context prefix with recent summaries
+    let context_prefix = if !recent_context.is_empty() {
+        format!(
+            "**RECENT CONTEXT (last sessions):**\n{}\n\n---\n\n",
+            recent_context.join("\n\n")
+        )
+    } else {
+        String::new()
+    };
+
+    let user_message = format!("{}{}", context_prefix, formatted_logs);
+
+    let temperature = ai_settings.temperature.unwrap_or(0.2);
 
     let payload = ChatRequest {
-        model: model_name.to_string(),  // 🔧 Use dynamic model
+        model: model_name.to_string(),
         messages: vec![
             Message {
                 role: "system".to_string(),
@@ -108,11 +161,12 @@ pub async fn generate_summary(
             },
             Message {
                 role: "user".to_string(),
-                content: formatted_logs,
+                content: user_message,
             },
         ],
-        temperature: 0.2,
+        temperature,
     };
+
     let response = ai_client
         .send_chat_completion(&ai_settings, &payload)
         .await?;
@@ -137,31 +191,102 @@ pub async fn generate_summary(
                 Some(content)
             }
         })
-        .ok_or_else(|| anyhow!("LM Studio response did not contain a summary"))?;
+        .ok_or_else(|| anyhow!("AI provider response did not contain a summary"))?;
 
     Ok(summary)
+}
+
+/// Fetch recent summaries for context
+async fn fetch_recent_summaries(pool: &SqlitePool, limit: i64) -> Result<Vec<String>, Error> {
+    let rows = sqlx::query_as::<_, AiReportRow>(
+        "SELECT id, summary, generated_at, log_count, sources, session_id 
+         FROM ai_reports 
+         ORDER BY generated_at DESC 
+         LIMIT ?1",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    let summaries: Vec<String> = rows
+        .into_iter()
+        .map(|row| {
+            // Extract first 500 chars of summary to avoid token bloat
+            let summary_preview = if row.summary.len() > 500 {
+                format!("{}...", &row.summary[..500])
+            } else {
+                row.summary
+            };
+            format!("**{}**\n{}", row.generated_at, summary_preview)
+        })
+        .collect();
+
+    Ok(summaries)
 }
 
 fn format_logs(mut logs: Vec<ActivityLog>) -> Result<String, Error> {
     logs.sort_by_key(|log| log.timestamp);
 
-    let lines = logs
-        .into_iter()
-        .map(|log| {
-            let payload = format_payload(&log.payload)?;
-            Ok(format!(
-                "- [{}] {}\n  ```json\n{}\n  ```",
-                log.timestamp.to_rfc3339(),
-                log.source,
-                payload
-            ))
-        })
-        .collect::<Result<Vec<String>, Error>>()?;
+    // Group logs by source for better readability
+    let mut terminal_logs = Vec::new();
+    let mut browser_logs = Vec::new();
+    let mut vscode_logs = Vec::new();
+    let mut other_logs = Vec::new();
 
-    Ok(format!(
-        "Chronological activity logs (oldest to newest):\n{}",
-        lines.join("\n")
-    ))
+    for log in logs {
+        match log.source.as_str() {
+            "terminal" => terminal_logs.push(log),
+            "browser" => browser_logs.push(log),
+            "vscode" => vscode_logs.push(log),
+            _ => other_logs.push(log),
+        }
+    }
+
+    let mut formatted = String::from("## Activity Logs by Source\n\n");
+
+    if !terminal_logs.is_empty() {
+        formatted.push_str("### Terminal Commands\n");
+        for log in terminal_logs {
+            if let Some(cmd) = &log.command {
+                formatted.push_str(&format!("- `{}` at {}\n", cmd, log.timestamp.to_rfc3339()));
+            } else {
+                let payload = format_payload(&log.payload)?;
+                formatted.push_str(&format!("- {}\n", payload));
+            }
+        }
+        formatted.push('\n');
+    }
+
+    if !browser_logs.is_empty() {
+        formatted.push_str("### Browser Activity\n");
+        for log in browser_logs {
+            let url = log.url.as_deref().unwrap_or("unknown");
+            let title = log.title.as_deref().unwrap_or("");
+            formatted.push_str(&format!("- {} - {} at {}\n", url, title, log.timestamp.to_rfc3339()));
+        }
+        formatted.push('\n');
+    }
+
+    if !vscode_logs.is_empty() {
+        formatted.push_str("### Code Editor Activity\n");
+        for log in vscode_logs {
+            if let Some(file) = &log.file_path {
+                let lang = log.title.as_deref().unwrap_or("unknown");
+                formatted.push_str(&format!("- {} ({}) at {}\n", file, lang, log.timestamp.to_rfc3339()));
+            }
+        }
+        formatted.push('\n');
+    }
+
+    if !other_logs.is_empty() {
+        formatted.push_str("### Other Activity\n");
+        for log in other_logs {
+            let payload = format_payload(&log.payload)?;
+            formatted.push_str(&format!("- [{}] {}\n", log.source, payload));
+        }
+    }
+
+    Ok(formatted)
 }
 
 fn format_payload(payload: &Value) -> Result<String, Error> {

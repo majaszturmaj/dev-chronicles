@@ -34,7 +34,7 @@ pub async fn get_logs_by_date(
     let end = start + Duration::days(1);
 
     let rows = sqlx::query_as::<_, ActivityLogRow>(
-        "SELECT id, source, payload, timestamp FROM activity_logs \
+        "SELECT id, source, payload, timestamp, log_type, session_id, command, url, domain, title, file_path FROM activity_logs \
          WHERE timestamp >= ?1 AND timestamp < ?2 \
          ORDER BY timestamp DESC",
     )
@@ -76,7 +76,7 @@ pub async fn trigger_manual_summary(
     let start = end - Duration::minutes(15);
 
     let rows = sqlx::query_as::<_, ActivityLogRow>(
-        "SELECT id, source, payload, timestamp FROM activity_logs \
+        "SELECT id, source, payload, timestamp, log_type, session_id, command, url, domain, title, file_path FROM activity_logs \
          WHERE timestamp >= ?1 AND timestamp <= ?2 \
          ORDER BY timestamp ASC",
     )

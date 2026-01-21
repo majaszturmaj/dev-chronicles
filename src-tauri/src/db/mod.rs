@@ -19,25 +19,27 @@ impl fmt::Display for SimpleError {
 impl Error for SimpleError {}
 
 pub async fn init_db(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-    sqlx::query(SCHEMA)
-        .execute(pool)
-        .await?;
+    // Split schema into individual statements and execute them separately
+    for statement in SCHEMA.split(';') {
+        let trimmed = statement.trim();
+        if !trimmed.is_empty() {
+            sqlx::query(trimmed)
+                .execute(pool)
+                .await?;
+        }
+    }
 
     Ok(())
 }
 
 pub async fn get_ai_settings(pool: &SqlitePool) -> Result<AiSettings, sqlx::Error> {
     let row = sqlx::query_as::<_, AiSettingsRow>(
-        "SELECT provider_url, api_key, model_name FROM ai_settings WHERE id = 1"
+        "SELECT provider_url, api_key, model_name, temperature, batch_size, summary_frequency_min FROM ai_settings WHERE id = 1"
     )
     .fetch_one(pool)
     .await?;
 
-    // Zamieniamy możliwy błąd z try_from na sqlx::Error::Decode opakowując go w Box<dyn Error>
-    let settings = AiSettings::try_from(row).map_err(|e| {
-        // e może być różnych typów (np. Infallible) — sformatujemy go i zapakujemy w Box<dyn Error>
-        sqlx::Error::Decode(Box::new(SimpleError(format!("{:?}", e))))
-    })?;
+    let settings = AiSettings::from(row);
 
     Ok(settings)
 }

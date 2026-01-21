@@ -7,15 +7,24 @@ interface SettingsProps {
   onSettingsSaved?: (settings: AiSettings) => void;
 }
 
+interface ExtendedSettings extends AiSettings {
+  temperature?: number;
+  batch_size?: number;
+  summary_frequency_min?: number;
+}
+
 const DEFAULT_URL = "http://localhost:1234/v1";
 const DEFAULT_MODEL = "gpt-4o-mini";
 
 const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState<AiSettings>({
+  const [settings, setSettings] = useState<ExtendedSettings>({
     providerUrl: DEFAULT_URL,
     apiKey: "",
-    model_name: DEFAULT_MODEL,  // ✨ ADD THIS
+    model_name: DEFAULT_MODEL,
+    temperature: 0.2,
+    batch_size: 100,
+    summary_frequency_min: 10,
   });
   const [error, setError] = useState<string>();
   const [successMessage, setSuccessMessage] = useState<string>();
@@ -30,7 +39,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
         const response = await invokeCommand<{ 
           provider_url: string; 
           api_key?: string | null;
-          model_name: string;  // ✨ ADD THIS
+          model_name: string;
+          temperature?: number;
+          batch_size?: number;
+          summary_frequency_min?: number;
         }>("fetch_ai_settings");
         if (!isMounted) {
           return;
@@ -38,7 +50,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
         setSettings({
           providerUrl: response.provider_url || DEFAULT_URL,
           apiKey: response.api_key ?? "",
-          model_name: response.model_name || DEFAULT_MODEL,  // ✨ ADD THIS
+          model_name: response.model_name || DEFAULT_MODEL,
+          temperature: response.temperature ?? 0.2,
+          batch_size: response.batch_size ?? 100,
+          summary_frequency_min: response.summary_frequency_min ?? 10,
         });
       } catch (err) {
         console.error("Failed to load AI settings", err);
@@ -59,10 +74,10 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
   }, []);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
+    const { name, value, type } = event.target;
     setSettings((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "number" ? parseFloat(value) : value,
     }));
   };
 
@@ -74,10 +89,13 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
 
     try {
       await invokeCommand("save_ai_settings", {
-        settings: {  // ✨ WRAP IN settings OBJECT
+        settings: {
           provider_url: settings.providerUrl,
           api_key: settings.apiKey || null,
-          model_name: settings.model_name,  // ✨ ADD THIS
+          model_name: settings.model_name,
+          temperature: settings.temperature,
+          batch_size: settings.batch_size,
+          summary_frequency_min: settings.summary_frequency_min,
         }
       });
       setSuccessMessage("Settings saved successfully.");
@@ -92,14 +110,16 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
   };
 
   const handleTestConnection = async () => {
-    // First save the current settings if they've changed
     if (settings.providerUrl.trim()) {
       try {
         await invokeCommand("save_ai_settings", {
-          settings: {  // ✨ WRAP IN settings OBJECT
+          settings: {
             provider_url: settings.providerUrl,
             api_key: settings.apiKey || null,
-            model_name: settings.model_name,  // ✨ ADD THIS
+            model_name: settings.model_name,
+            temperature: settings.temperature,
+            batch_size: settings.batch_size,
+            summary_frequency_min: settings.summary_frequency_min,
           }
         });
       } catch (err) {
@@ -171,6 +191,67 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
             />
             <p className="text-xs text-slate-500">
               Examples: gpt-4o-mini, gpt-3.5-turbo, or any model loaded in LM Studio.
+            </p>
+          </div>
+
+          {/* ✨ NEW FIELD: Temperature (Creativity) */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-200" htmlFor="temperature">
+              Temperature (Creativity): {settings.temperature}
+            </label>
+            <input
+              id="temperature"
+              name="temperature"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={settings.temperature ?? 0.2}
+              onChange={handleChange}
+              className="w-full"
+            />
+            <p className="text-xs text-slate-500">
+              Lower = more deterministic/focused (0.0-0.3). Higher = more creative/varied (0.7-2.0).
+            </p>
+          </div>
+
+          {/* ✨ NEW FIELD: Batch Size */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-200" htmlFor="batch-size">
+              Batch Size (logs per summary)
+            </label>
+            <input
+              id="batch-size"
+              name="batch_size"
+              type="number"
+              min="10"
+              max="1000"
+              value={settings.batch_size ?? 100}
+              onChange={handleChange}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            <p className="text-xs text-slate-500">
+              How many activity logs to include in each summary (10-1000).
+            </p>
+          </div>
+
+          {/* ✨ NEW FIELD: Summary Frequency */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-200" htmlFor="summary-frequency">
+              Summary Frequency (minutes)
+            </label>
+            <input
+              id="summary-frequency"
+              name="summary_frequency_min"
+              type="number"
+              min="5"
+              max="60"
+              value={settings.summary_frequency_min ?? 10}
+              onChange={handleChange}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            <p className="text-xs text-slate-500">
+              Automatically generate summaries every N minutes (5-60).
             </p>
           </div>
 

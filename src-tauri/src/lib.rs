@@ -134,9 +134,10 @@ async fn auto_process_logs(
     let end = Utc::now();
     let start = end - Duration::minutes(10);
 
-    // Only fetch unprocessed logs
+    // Fetch unprocessed logs with all normalized fields
     let rows = sqlx::query_as::<_, ActivityLogRow>(
-        "SELECT id, source, payload, timestamp FROM activity_logs \
+        "SELECT id, source, payload, timestamp, log_type, session_id, command, url, domain, title, file_path 
+         FROM activity_logs \
          WHERE is_processed = 0 AND timestamp >= ?1 AND timestamp <= ?2 \
          ORDER BY timestamp ASC",
     )
@@ -155,14 +156,30 @@ async fn auto_process_logs(
         .collect::<Result<_, ActivityLogConversionError>>()
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.0)) as Box<dyn Error>)?;
 
+    // Collect log IDs and metadata before generating summary
+    let log_ids: Vec<i64> = logs.iter().map(|l| l.id).collect();
+    let sources_set: std::collections::HashSet<String> = logs.iter().map(|l| l.source.clone()).collect();
+    let sources_vec: Vec<String> = sources_set.into_iter().collect();
+
     let summary = ai::generate_summary(pool, ai_client.inner(), logs).await?;
 
-    // Save the summary
-    sqlx::query("INSERT INTO ai_reports (summary, generated_at) VALUES (?1, ?2)")
-        .bind(&summary)
-        .bind(end.to_rfc3339())
-        .execute(pool)
-        .await?;
+    // Save the summary with metadata
+    let log_ids_json = serde_json::to_string(&log_ids).unwrap_or_default();
+    let sources_str = sources_vec.join(",");
+
+    sqlx::query(
+        "INSERT INTO ai_reports (summary, generated_at, log_ids, log_count, sources, time_range_start, time_range_end) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+    )
+    .bind(&summary)
+    .bind(end.to_rfc3339())
+    .bind(&log_ids_json)
+    .bind(log_ids.len() as i64)
+    .bind(&sources_str)
+    .bind(start.to_rfc3339())
+    .bind(end.to_rfc3339())
+    .execute(pool)
+    .await?;
 
     // Mark logs as processed
     sqlx::query("UPDATE activity_logs SET is_processed = 1 WHERE timestamp >= ?1 AND timestamp <= ?2")

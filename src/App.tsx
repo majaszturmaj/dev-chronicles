@@ -71,6 +71,7 @@ function App(): JSX.Element {
   };
 
   const recentEvents = useMemo(() => logs.slice(0, 5), [logs]);
+  const [isDebugCollapsed, setIsDebugCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 p-8 text-slate-100">
@@ -119,36 +120,63 @@ function App(): JSX.Element {
             reportError={reportError}
           />
 
-          <section className="mt-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-            <header className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Debug: Recent Events</h2>
-              <span className="text-sm text-slate-400">Total logs today: {logs.length}</span>
+          <section className="mt-8 rounded-lg border border-slate-800 bg-slate-900/60 overflow-hidden">
+            <header 
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-900/80 transition"
+              onClick={() => setIsDebugCollapsed(!isDebugCollapsed)}
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">Debug: Recent Events</h2>
+                <span className="text-sm text-slate-400">Total logs today: {logs.length}</span>
+              </div>
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-200 transition"
+                aria-label={isDebugCollapsed ? "Expand" : "Collapse"}
+              >
+                <svg
+                  className={`w-5 h-5 transition-transform ${isDebugCollapsed ? "" : "rotate-180"}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
             </header>
-            {aiSettings && (
-              <p className="mt-2 text-xs text-slate-500">
-                Using AI provider at <span className="font-semibold text-slate-300">{aiSettings.providerUrl}</span>
-                {/* ✨ ADD MODEL INFO */}
-                {" "}with model <span className="font-semibold text-slate-300">{aiSettings.model_name}</span>
-              </p>
+            {!isDebugCollapsed && (
+              <div className="overflow-y-auto px-4 pb-4" style={{ maxHeight: "400px" }}>
+                {aiSettings && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Using AI provider at <span className="font-semibold text-slate-300">{aiSettings.providerUrl}</span>
+                    {" "}with model <span className="font-semibold text-slate-300">{aiSettings.model_name}</span>
+                  </p>
+                )}
+                {recentEvents.length === 0 && !isLoading && (
+                  <p className="mt-2 text-sm text-slate-400 py-4">No logs returned for today.</p>
+                )}
+                <ul className="mt-4 space-y-2">
+                  {recentEvents.map((log) => (
+                    <li key={log.id} className="rounded-md border border-slate-800 bg-slate-950/70 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-200">{log.source}</span>
+                        <time className="text-xs text-slate-400">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </time>
+                      </div>
+                      <pre className="mt-2 overflow-x-auto text-xs text-slate-300">
+                        {JSON.stringify(log.payload, null, 2)}
+                      </pre>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
-            {recentEvents.length === 0 && !isLoading && (
-              <p className="mt-2 text-sm text-slate-400">No logs returned for today.</p>
-            )}
-            <ul className="mt-4 space-y-2">
-              {recentEvents.map((log) => (
-                <li key={log.id} className="rounded-md border border-slate-800 bg-slate-950/70 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-200">{log.source}</span>
-                    <time className="text-xs text-slate-400">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </time>
-                  </div>
-                  <pre className="mt-2 overflow-x-auto text-xs text-slate-300">
-                    {JSON.stringify(log.payload, null, 2)}
-                  </pre>
-                </li>
-              ))}
-            </ul>
           </section>
         </>
       ) : (

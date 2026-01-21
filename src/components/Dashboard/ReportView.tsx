@@ -7,11 +7,11 @@ interface ReportViewProps {
 
 const ReportView: React.FC<ReportViewProps> = ({ content }) => {
   return (
-    <article className="prose prose-invert max-w-none">
+    <article className="prose prose-invert max-w-none text-slate-200">
       {content ? (
         <ReactMarkdown>{content}</ReactMarkdown>
       ) : (
-        <p className="text-slate-400">Summaries will appear here once generated.</p>
+        <p className="text-slate-400 py-4">Summaries will appear here once generated.</p>
       )}
     </article>
   );

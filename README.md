@@ -78,6 +78,24 @@ curl -sS http://127.0.0.1:3030/health
 
 See `docs/ingest-samples.md` for a collection of sample curl commands that post typical browser, terminal, and VSCode events to the embedded Axum server. These are copy/paste-ready and useful for local testing.
 
+### Quick Setup and Test Script
+
+For automated setup and testing, use the Python quick setup script:
+
+```bash
+python3 quick_setup.py
+```
+
+This script will:
+1. Set up all extensions (terminal hook, VS Code compilation)
+2. Start the DevChronicle application
+3. Send 20 realistic "building Yocto Linux" workflow events to test AI summarization
+
+**Requirements:**
+- Python 3.6+
+- `requests` library (optional, falls back to curl): `pip install requests`
+- All system dependencies (curl, jq, bc, node, npm, cargo)
+
 ## Contributing
 
 - Run `npm run build` to run TypeScript checks and build the frontend assets

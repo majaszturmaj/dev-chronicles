@@ -1,5 +1,6 @@
 import React from "react";
 import { ActivityLog } from "../../types";
+import CollapsibleSection from "./CollapsibleSection";
 
 interface TimelineProps {
   logs: ActivityLog[];
@@ -7,14 +8,15 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ logs }) => {
   return (
-    <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Activity Timeline</h2>
-        <span className="text-sm text-slate-400">{logs.length} events</span>
-      </header>
+    <CollapsibleSection
+      title="Activity Timeline"
+      count={logs.length}
+      countLabel="events"
+      maxHeight="500px"
+    >
       <ol className="space-y-3">
         {logs.length === 0 && (
-          <li className="text-sm text-slate-400">No events captured yet.</li>
+          <li className="text-sm text-slate-400 py-4">No events captured yet.</li>
         )}
         {logs.map((log) => (
           <li key={log.id} className="rounded-md border border-slate-800 bg-slate-950/80 p-3">
@@ -30,7 +32,7 @@ const Timeline: React.FC<TimelineProps> = ({ logs }) => {
           </li>
         ))}
       </ol>
-    </section>
+    </CollapsibleSection>
   );
 };
 

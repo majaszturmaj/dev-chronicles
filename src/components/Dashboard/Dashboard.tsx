@@ -1,6 +1,7 @@
 import React from "react";
 import Timeline from "./Timeline";
 import ReportView from "./ReportView";
+import CollapsibleSection from "./CollapsibleSection";
 import { ActivityLog } from "../../types";
 
 interface DashboardProps {
@@ -57,10 +58,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <Timeline logs={logs} />
 
-      <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-        <h2 className="text-xl font-semibold">AI Reports</h2>
-        <ReportView content={latestReport} />
-      </section>
+      <CollapsibleSection
+        title="AI Reports"
+        maxHeight="400px"
+        defaultCollapsed={!latestReport}
+      >
+        <div className="space-y-4">
+          <ReportView content={latestReport} />
+        </div>
+      </CollapsibleSection>
     </div>
   );
 };

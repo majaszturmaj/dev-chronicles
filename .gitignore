@@ -9,3 +9,4 @@
 /lib.rs-sketch.md
 /node_modules
 /target
+.env

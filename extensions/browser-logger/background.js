@@ -25,7 +25,7 @@ async function sendEvent(payload) {
   }
 }
 
-function scheduleCapture(tabId, tab) {
+async function scheduleCapture(tabId, tab) {
   if (!tab || !tab.active || !tab.url || !tab.url.startsWith("http")) {
     return;
   }
@@ -35,6 +35,20 @@ function scheduleCapture(tabId, tab) {
   // Record when user started viewing this page
   const startTime = Date.now();
   pageStartTimes.set(tabId, startTime);
+
+  // Fetch server configuration (dwell interval) and use it when scheduling
+  let delayMs = 5000; // fallback
+  try {
+    const cfgRes = await fetch((DEFAULT_ENDPOINT.replace(/\/$/, "") + "/ingest/config"));
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      if (cfg && cfg.extension_send_interval_ms) {
+        delayMs = parseInt(cfg.extension_send_interval_ms, 10) || delayMs;
+      }
+    }
+  } catch (e) {
+    // ignore and use fallback
+  }
 
   const timer = setTimeout(async () => {
     try {
@@ -55,7 +69,7 @@ function scheduleCapture(tabId, tab) {
     } catch (error) {
       console.error("DevChronicle Browser Logger: unable to inspect tab", error);
     }
-  }, 5000); // Wait 5 seconds before sending
+  }, delayMs); // Use configured delay before sending
 
   dwellTimers.set(tabId, timer);
 }

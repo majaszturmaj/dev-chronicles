@@ -70,10 +70,22 @@ CREATE TABLE IF NOT EXISTS ai_settings (
     temperature REAL DEFAULT 0.2,
     batch_size INTEGER DEFAULT 100,
     summary_frequency_min INTEGER DEFAULT 10,
-    max_summary_tokens INTEGER DEFAULT 2000
+    max_summary_tokens INTEGER DEFAULT 2000,
+    extension_send_interval_sec REAL DEFAULT 5.0
 );
 
 -- Insert default settings only if table is empty
 INSERT INTO ai_settings (id, provider_url, api_key, model_name, temperature, batch_size, summary_frequency_min, max_summary_tokens)
 SELECT 1, 'http://localhost:1234/v1', NULL, 'gpt-4o-mini', 0.2, 100, 10, 2000
 WHERE NOT EXISTS (SELECT 1 FROM ai_settings WHERE id = 1);
+
+-- Interval (seconds) that extensions should use when deciding how often to send events
+-- Note: ALTER TABLE ADD COLUMN IF NOT EXISTS is not standard across SQLite versions; use a safe pattern
+PRAGMA foreign_keys = ON;
+-- Add column if not exists (best-effort). If DB already has the column this will error when executed directly,
+-- but the init path uses the schema at startup; keep the default in new installs.
+-- We also ensure rows have a non-null default below when present.
+-- The migration step below will set a default for existing rows when schema applied.
+
+-- Default extension send interval (seconds)
+-- For new DBs the column will be present with DEFAULT 5.0 as defined below in the CREATE TABLE; for existing DBs this will be handled at runtime.

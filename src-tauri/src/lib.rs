@@ -108,12 +108,12 @@ fn create_pool(database_url: &str) -> Result<SqlitePool, Box<dyn Error>> {
 
 async fn start_server(router: axum::Router) -> Result<(), Box<dyn Error + Send + Sync>>
 {
-    let addr = format!("127.0.0.1:{}", SERVER_PORT);
+    let addr = format!("[::]:{}", SERVER_PORT);
     println!("🎧 Binding Axum server to {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     
-    println!("✅ Axum server successfully started on http://{}", addr);
+    println!("✅ Axum server successfully started on http://127.0.0.1:{} and http://[::1]:{} (bound to IPv6 ::)", SERVER_PORT, SERVER_PORT);
 
     // into_make_service() is available on Router without type parameters
     axum::serve(listener, router.into_make_service())

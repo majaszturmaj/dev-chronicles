@@ -109,6 +109,7 @@ pub struct AiSettings {
     pub temperature: Option<f32>,
     pub batch_size: Option<i64>,
     pub summary_frequency_min: Option<i64>,
+    pub extension_send_interval_sec: Option<f32>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -119,6 +120,7 @@ pub struct AiSettingsRow {
     pub temperature: Option<f32>,
     pub batch_size: Option<i64>,
     pub summary_frequency_min: Option<i64>,
+    pub extension_send_interval_sec: Option<f32>,
 }
 
 impl From<AiSettingsRow> for AiSettings {
@@ -130,6 +132,7 @@ impl From<AiSettingsRow> for AiSettings {
             temperature: row.temperature,
             batch_size: row.batch_size,
             summary_frequency_min: row.summary_frequency_min,
+            extension_send_interval_sec: row.extension_send_interval_sec,
         }
     }
 }

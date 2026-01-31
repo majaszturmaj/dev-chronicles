@@ -144,6 +144,7 @@ pub struct SaveAiSettingsPayload {
     pub provider_url: String,
     pub api_key: Option<String>,
     pub model_name: String,
+    pub extension_send_interval_sec: Option<f32>,
 }
 
 #[tauri::command]
@@ -173,7 +174,13 @@ pub async fn save_ai_settings(
         return Err("Model name must not be empty".to_string());
     }
 
-    upsert_ai_settings(pool.inner(), provider_url, api_key.as_deref(), model_name)
+    upsert_ai_settings(
+        pool.inner(),
+        provider_url,
+        api_key.as_deref(),
+        model_name,
+        settings.extension_send_interval_sec,
+    )
         .await
         .map_err(|err| err.to_string())
 }
@@ -183,6 +190,7 @@ pub struct AiSettingsResponse {
     pub provider_url: String,
     pub api_key: Option<String>,
     pub model_name: String,
+    pub extension_send_interval_sec: Option<f32>,
 }
 
 #[tauri::command]
@@ -197,6 +205,7 @@ pub async fn fetch_ai_settings(
         provider_url: settings.provider_url,
         api_key: settings.api_key,
         model_name: settings.model_name,
+        extension_send_interval_sec: settings.extension_send_interval_sec,
     })
 }
 #[tauri::command]

@@ -417,168 +417,6 @@ def start_app() -> Optional[subprocess.Popen]:
         print_error(f"Failed to start application: {e}")
         return None
 
-def send_event(endpoint: str, payload: Dict) -> bool:
-    """Send an event to the ingestion server."""
-    if HAS_REQUESTS:
-        try:
-            response = requests.post(
-                f"{ENDPOINT}{endpoint}",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=5
-            )
-            return response.status_code == 201
-        except Exception as e:
-            print_error(f"Failed to send event: {e}")
-            return False
-    else:
-        # Fallback to curl
-        try:
-            json_data = json.dumps(payload)
-            result = subprocess.run(
-                ["curl", "-sS", "-X", "POST", f"{ENDPOINT}{endpoint}",
-                 "-H", "Content-Type: application/json",
-                 "-d", json_data],
-                capture_output=True,
-                timeout=5
-            )
-            return result.returncode == 0
-        except Exception as e:
-            print_error(f"Failed to send event: {e}")
-            return False
-
-def generate_yocto_workflow() -> List[Dict]:
-    """Generate 20 realistic Yocto Linux build workflow events."""
-    
-    base_time = datetime.now() - timedelta(minutes=45)
-    workspace = "/home/dev/yocto-build"
-    
-    events = []
-    
-    # Terminal events
-    terminal_events = [
-        {"command": "cd ~/yocto-build", "exit_code": 0, "duration": 0.1, "cwd": str(Path.home())},
-        {"command": "git clone https://git.yoctoproject.org/poky", "exit_code": 0, "duration": 45.2, "cwd": workspace},
-        {"command": "cd poky", "exit_code": 0, "duration": 0.1, "cwd": workspace},
-        {"command": "git checkout kirkstone", "exit_code": 0, "duration": 2.3, "cwd": f"{workspace}/poky"},
-        {"command": "source oe-init-build-env build", "exit_code": 0, "duration": 1.5, "cwd": f"{workspace}/poky"},
-        {"command": "bitbake-layers show-layers", "exit_code": 0, "duration": 3.2, "cwd": f"{workspace}/poky/build"},
-        {"command": "bitbake core-image-minimal", "exit_code": 1, "duration": 120.5, "cwd": f"{workspace}/poky/build", "error": "ERROR: No space left on device"},
-        {"command": "df -h", "exit_code": 0, "duration": 0.3, "cwd": f"{workspace}/poky/build"},
-        {"command": "sudo apt-get clean", "exit_code": 0, "duration": 5.1, "cwd": f"{workspace}/poky/build"},
-        {"command": "bitbake core-image-minimal", "exit_code": 0, "duration": 892.4, "cwd": f"{workspace}/poky/build"},
-        {"command": "ls -lh tmp/deploy/images/qemux86-64/", "exit_code": 0, "duration": 0.2, "cwd": f"{workspace}/poky/build"},
-    ]
-    
-    # Browser events
-    browser_events = [
-        {"url": "https://docs.yoctoproject.org/", "title": "Yocto Project Documentation", "time_on_page": 180},
-        {"url": "https://docs.yoctoproject.org/dev-manual/common-tasks.html", "title": "Common Tasks - Yocto Project", "time_on_page": 240},
-        {"url": "https://stackoverflow.com/questions/yocto-build-error", "title": "Yocto build error - Stack Overflow", "time_on_page": 120},
-        {"url": "https://www.yoctoproject.org/docs/current/ref-manual/ref-manual.html", "title": "Yocto Project Reference Manual", "time_on_page": 95},
-    ]
-    
-    # VS Code events
-    vscode_events = [
-        {"event": "file_open", "file": f"{workspace}/poky/build/conf/local.conf", "language": "conf", "workspace": workspace},
-        {"event": "file_save", "file": f"{workspace}/poky/build/conf/local.conf", "language": "conf", "workspace": workspace, "time_spent": 45},
-        {"event": "file_open", "file": f"{workspace}/poky/build/conf/bblayers.conf", "language": "conf", "workspace": workspace},
-        {"event": "file_save", "file": f"{workspace}/poky/build/conf/bblayers.conf", "language": "conf", "workspace": workspace, "time_spent": 30},
-        {"event": "file_open", "file": f"{workspace}/poky/meta-custom/recipes-core/images/my-image.bb", "language": "bitbake", "workspace": workspace},
-        {"event": "file_save", "file": f"{workspace}/poky/meta-custom/recipes-core/images/my-image.bb", "language": "bitbake", "workspace": workspace, "time_spent": 120},
-    ]
-    
-    # Combine and interleave events with timestamps
-    time_offset = 0
-    
-    # Add terminal events
-    for i, event in enumerate(terminal_events):
-        events.append({
-            "timestamp": (base_time + timedelta(minutes=time_offset)).isoformat() + "Z",
-            "source": "terminal",
-            "payload": {
-                "command": event["command"],
-                "exit_code": event["exit_code"],
-                "duration_sec": event["duration"],
-                "cwd": event["cwd"],
-                **({"error": event["error"]} if "error" in event else {})
-            }
-        })
-        time_offset += max(1, int(event["duration"] / 60)) + 1
-    
-    # Add browser events (interleaved)
-    browser_time_offset = 5
-    for event in browser_events:
-        events.append({
-            "timestamp": (base_time + timedelta(minutes=browser_time_offset)).isoformat() + "Z",
-            "source": "browser",
-            "payload": {
-                "url": event["url"],
-                "title": event["title"],
-                "time_on_page_sec": event["time_on_page"],
-                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
-            }
-        })
-        browser_time_offset += max(2, event["time_on_page"] // 60) + 3
-    
-    # Add VS Code events (interleaved)
-    vscode_time_offset = 10
-    for event in vscode_events:
-        events.append({
-            "timestamp": (base_time + timedelta(minutes=vscode_time_offset)).isoformat() + "Z",
-            "source": "vscode",
-            "payload": {
-                "event": event["event"],
-                "file": event["file"],
-                "language": event["language"],
-                "workspace": event["workspace"],
-                **({"time_spent_sec": event["time_spent"]} if "time_spent" in event else {})
-            }
-        })
-        vscode_time_offset += 5
-    
-    # Sort by timestamp and limit to 20 events
-    events.sort(key=lambda x: x["timestamp"])
-    return events[:20]
-
-def send_test_events():
-    """Send test events simulating Yocto Linux build workflow."""
-    print_step("Generating Yocto Linux build workflow events...")
-    
-    events = generate_yocto_workflow()
-    print_success(f"Generated {len(events)} workflow events")
-    
-    print_step("Sending events to DevChronicle...")
-    
-    success_count = 0
-    for i, event in enumerate(events, 1):
-        source = event["source"]
-        endpoint = f"/ingest/{source}"
-        
-        # Remove timestamp from payload (server will use current time if not provided)
-        payload = {
-            "source": source,
-            "payload": event["payload"]
-        }
-        
-        if send_event(endpoint, payload):
-            success_count += 1
-            print(f"  [{i}/{len(events)}] {Colors.GREEN}✓{Colors.RESET} {source}: {event['payload'].get('command', event['payload'].get('url', event['payload'].get('file', 'event')))[:50]}")
-        else:
-            print(f"  [{i}/{len(events)}] {Colors.RED}✗{Colors.RESET} Failed to send {source} event")
-        
-        # Small delay between events
-        time.sleep(0.3)
-    
-    print()
-    if success_count == len(events):
-        print_success(f"All {success_count} events sent successfully!")
-    else:
-        print_warning(f"Sent {success_count}/{len(events)} events")
-    
-    print_info("Check the DevChronicle dashboard to see the AI-generated summary")
-    print_info("The AI should summarize this as: 'Building Yocto Linux image, encountered disk space issue, resolved it, and successfully completed the build'")
-
 def main():
     """Main execution flow."""
     print(f"{Colors.BOLD}{Colors.CYAN}")
@@ -687,16 +525,13 @@ def main():
     
     print()
     
-    # Step 5: Send test events
-    send_test_events()
-    
-    print()
     print(f"{Colors.BOLD}{Colors.GREEN}Setup complete!{Colors.RESET}")
     print()
     print_info("Next steps:")
     print_info("  1. Check the DevChronicle dashboard for AI-generated summaries")
     print_info("  2. Load the Chrome extension manually (see instructions above)")
     print_info("  3. Restart your terminal or run: source ~/.bashrc (or ~/.zshrc)")
+    print_info("  4. (Optional) Generate test traffic: python generate_fake_traffic.py")
     
     if app_process:
         print()

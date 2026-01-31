@@ -11,6 +11,7 @@ interface ExtendedSettings extends AiSettings {
   temperature?: number;
   batch_size?: number;
   summary_frequency_min?: number;
+  extension_send_interval_sec?: number;
 }
 
 const DEFAULT_URL = "http://localhost:1234/v1";
@@ -25,6 +26,7 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
     temperature: 0.2,
     batch_size: 100,
     summary_frequency_min: 10,
+    extension_send_interval_sec: 5,
   });
   const [error, setError] = useState<string>();
   const [successMessage, setSuccessMessage] = useState<string>();
@@ -43,6 +45,7 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
           temperature?: number;
           batch_size?: number;
           summary_frequency_min?: number;
+          extension_send_interval_sec?: number;
         }>("fetch_ai_settings");
         if (!isMounted) {
           return;
@@ -54,6 +57,7 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
           temperature: response.temperature ?? 0.2,
           batch_size: response.batch_size ?? 100,
           summary_frequency_min: response.summary_frequency_min ?? 10,
+          extension_send_interval_sec: response.extension_send_interval_sec ?? 5,
         });
       } catch (err) {
         console.error("Failed to load AI settings", err);
@@ -96,6 +100,7 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
           temperature: settings.temperature,
           batch_size: settings.batch_size,
           summary_frequency_min: settings.summary_frequency_min,
+          extension_send_interval_sec: settings.extension_send_interval_sec,
         }
       });
       setSuccessMessage("Settings saved successfully.");
@@ -110,22 +115,23 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
   };
 
   const handleTestConnection = async () => {
-    if (settings.providerUrl.trim()) {
-      try {
-        await invokeCommand("save_ai_settings", {
-          settings: {
-            provider_url: settings.providerUrl,
-            api_key: settings.apiKey || null,
-            model_name: settings.model_name,
-            temperature: settings.temperature,
-            batch_size: settings.batch_size,
-            summary_frequency_min: settings.summary_frequency_min,
-          }
-        });
-      } catch (err) {
-        console.error("Failed to save settings before test", err);
+      if (settings.providerUrl.trim()) {
+        try {
+          await invokeCommand("save_ai_settings", {
+            settings: {
+              provider_url: settings.providerUrl,
+              api_key: settings.apiKey || null,
+              model_name: settings.model_name,
+              temperature: settings.temperature,
+              batch_size: settings.batch_size,
+              summary_frequency_min: settings.summary_frequency_min,
+              extension_send_interval_sec: settings.extension_send_interval_sec,
+            }
+          });
+        } catch (err) {
+          console.error("Failed to save settings before test", err);
+        }
       }
-    }
 
     setTestResult(null);
     setError(undefined);
@@ -252,6 +258,27 @@ const Settings: React.FC<SettingsProps> = ({ onSettingsSaved }) => {
             />
             <p className="text-xs text-slate-500">
               Automatically generate summaries every N minutes (5-60).
+            </p>
+          </div>
+
+          {/* Extension send interval */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-200" htmlFor="extension-interval">
+              Extension Send Interval (seconds)
+            </label>
+            <input
+              id="extension-interval"
+              name="extension_send_interval_sec"
+              type="number"
+              min="0.5"
+              max="3600"
+              step="0.5"
+              value={settings.extension_send_interval_sec ?? 5}
+              onChange={handleChange}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            <p className="text-xs text-slate-500">
+              How often external extensions should send events to the server (0.5s - 3600s).
             </p>
           </div>
 

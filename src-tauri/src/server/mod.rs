@@ -17,6 +17,7 @@ pub fn build_router(pool: sqlx::SqlitePool) -> Router {
         .route("/ingest/terminal", post(handlers::ingest))
         .route("/ingest/vscode", post(handlers::ingest))
         .route("/ingest/browser", post(handlers::ingest))
+        .route("/ingest/config", get(handlers::get_config))
         .route("/health", get(|| async { "OK" }))  // Health check
         .with_state(AppState { pool })
         .layer(cors)

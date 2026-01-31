@@ -5,6 +5,7 @@ use serde_json::Value;
 use sqlx::SqlitePool;
 
 use crate::state::AppState;
+use crate::db::get_ai_settings as load_ai_settings;
 
 #[derive(Deserialize)]
 pub struct IngestRequest {
@@ -50,6 +51,22 @@ pub async fn ingest(
     println!("✅ Successfully saved log to database");
     
     Ok(StatusCode::CREATED)
+}
+
+/// Return small runtime configuration for extensions (milliseconds)
+pub async fn get_config(
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> {
+    // Load ai settings to read extension interval
+    match load_ai_settings(&state.pool).await {
+        Ok(settings) => {
+            let interval_sec = settings.extension_send_interval_sec.unwrap_or(5.0_f32);
+            let interval_ms = (interval_sec * 1000.0) as i64;
+            let body = serde_json::json!({ "extension_send_interval_ms": interval_ms });
+            Ok((StatusCode::OK, Json(body)))
+        }
+        Err(err) => Err((StatusCode::INTERNAL_SERVER_ERROR, err.to_string())),
+    }
 }
 
 /// Extract normalized fields from payload based on source type

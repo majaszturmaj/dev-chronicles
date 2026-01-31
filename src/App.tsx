@@ -23,22 +23,27 @@ function App(): JSX.Element {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      setIsLoading(true);
       setError(undefined);
       const today = new Date().toISOString().slice(0, 10);
 
       try {
         const response = await invokeCommand<ActivityLog[]>("get_logs_by_date", { date: today });
         setLogs(response);
+        setIsLoading(false);
       } catch (err) {
         console.error("Failed to fetch logs", err);
         setError(err instanceof Error ? err.message : String(err));
-      } finally {
         setIsLoading(false);
       }
     };
 
+    // Fetch logs immediately
+    setIsLoading(true);
     fetchLogs();
+
+    // Poll for new logs every 2 seconds
+    const interval = setInterval(fetchLogs, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
